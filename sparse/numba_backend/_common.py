@@ -155,7 +155,7 @@ def tensordot(a, b, axes=2, *, return_type=None):
     bs = b.shape
     ndb = b.ndim
     equal = True
-    if nda == 0 or ndb == 0:
+    if not (builtins.all(-nda <= a < nda for a in axes_a) and builtins.all(-ndb <= a < ndb for a in axes_b)):
         pos = int(nda != 0)
         raise ValueError(f"Input {pos} operand does not have enough dimensions")
     if na != nb:
@@ -2019,7 +2019,7 @@ def format_to_string(format):
 
 
 @_check_device
-def asarray(obj, /, *, dtype=None, format="coo", copy=False, device=None):
+def asarray(obj, /, *, dtype=None, format="coo", copy=None, device=None):
     """
     Convert the input to a sparse array.
 
@@ -2057,8 +2057,11 @@ def asarray(obj, /, *, dtype=None, format="coo", copy=False, device=None):
 
     format_dict = {"coo": COO, "dok": DOK, "gcxs": GCXS, "csc": CSC, "csr": CSR}
 
+    if copy is False and (type(obj) is not format_dict[format] and (dtype is None or obj.dtype != dtype)):
+        raise ValueError("`copy=False` specified but no-copy isn't possible.")
+
     if isinstance(obj, COO | DOK | GCXS | CSC | CSR):
-        return obj.asformat(format)
+        return obj.astype(dtype).asformat(format)
 
     if _is_scipy_sparse_obj(obj):
         sparse_obj = format_dict[format].from_scipy_sparse(obj)
@@ -2066,7 +2069,11 @@ def asarray(obj, /, *, dtype=None, format="coo", copy=False, device=None):
             dtype = sparse_obj.dtype
         return sparse_obj.astype(dtype=dtype, copy=copy)
 
-    if np.isscalar(obj) or isinstance(obj, np.ndarray | Iterable):
+    if np.isscalar(obj):
+        obj = np.asarray(obj, dtype=dtype)
+        copy = None
+
+    if isinstance(obj, np.ndarray | Iterable):
         sparse_obj = format_dict[format].from_numpy(np.asarray(obj))
         if dtype is None:
             dtype = sparse_obj.dtype
@@ -2208,6 +2215,11 @@ def imag(x, /):
 
 def real(x, /):
     return x.real
+
+
+def can_cast(from_, to, /):
+    from_ = np.dtype(from_)
+    return np.can_cast(from_, to)
 
 
 def vecdot(x1, x2, /, *, axis=-1):

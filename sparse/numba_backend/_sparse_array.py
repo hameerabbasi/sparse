@@ -630,7 +630,9 @@ class SparseArray:
         # this matches numpy's behavior
         if self.dtype == dtype and not copy:
             return self
-        return self.__array_ufunc__(np.ndarray.astype, "__call__", self, dtype=dtype, copy=copy, casting=casting)
+        if copy is False:
+            raise ValueError("`copy=False` specified but no-copy isn't possible.")
+        return self.__array_ufunc__(np.ndarray.astype, "__call__", self, dtype=dtype, copy=True, casting=casting)
 
     def mean(self, axis=None, keepdims=False, dtype=None, out=None):
         """
